@@ -38,7 +38,7 @@ typedef struct ms_esv_sign_t {
 	int ms_retval;
 	char* ms_message;
 	size_t ms_len;
-	void* ms_buff;
+	void* ms_signature;
 	size_t ms_sig_len;
 } ms_esv_sign_t;
 
@@ -46,7 +46,7 @@ typedef struct ms_esv_verify_t {
 	int ms_retval;
 	char* ms_message;
 	size_t ms_len;
-	void* ms_buff;
+	void* ms_signature;
 	size_t ms_sig_len;
 } ms_esv_verify_t;
 
@@ -57,6 +57,12 @@ typedef struct ms_esv_close_t {
 typedef struct ms_esv_sign_callback_t {
 	const char* ms_str;
 } ms_esv_sign_callback_t;
+
+typedef struct ms_esv_verify_callback_t {
+	uint8_t ms_res;
+	void* ms_sig;
+	size_t ms_sig_len;
+} ms_esv_verify_callback_t;
 
 typedef struct ms_sgx_oc_cpuidex_t {
 	int* ms_cpuinfo;
@@ -185,16 +191,15 @@ static sgx_status_t SGX_CDECL sgx_esv_sign(void* pms)
 	ms_esv_sign_t* ms = SGX_CAST(ms_esv_sign_t*, pms);
 	sgx_status_t status = SGX_SUCCESS;
 	char* _tmp_message = ms->ms_message;
-	size_t _tmp_len = ms->ms_len;
-	size_t _len_message = _tmp_len;
-	char* _in_message = NULL;
-	void* _tmp_buff = ms->ms_buff;
 	size_t _tmp_sig_len = ms->ms_sig_len;
-	size_t _len_buff = _tmp_sig_len;
-	void* _in_buff = NULL;
+	size_t _len_message = _tmp_sig_len;
+	char* _in_message = NULL;
+	void* _tmp_signature = ms->ms_signature;
+	size_t _len_signature = _tmp_sig_len;
+	void* _in_signature = NULL;
 
 	CHECK_UNIQUE_POINTER(_tmp_message, _len_message);
-	CHECK_UNIQUE_POINTER(_tmp_buff, _len_buff);
+	CHECK_UNIQUE_POINTER(_tmp_signature, _len_signature);
 
 	//
 	// fence after pointer checks
@@ -214,23 +219,23 @@ static sgx_status_t SGX_CDECL sgx_esv_sign(void* pms)
 		}
 
 	}
-	if (_tmp_buff != NULL && _len_buff != 0) {
-		if ((_in_buff = (void*)malloc(_len_buff)) == NULL) {
+	if (_tmp_signature != NULL && _len_signature != 0) {
+		if ((_in_signature = (void*)malloc(_len_signature)) == NULL) {
 			status = SGX_ERROR_OUT_OF_MEMORY;
 			goto err;
 		}
 
-		memset((void*)_in_buff, 0, _len_buff);
+		memset((void*)_in_signature, 0, _len_signature);
 	}
 
-	ms->ms_retval = esv_sign(_in_message, _tmp_len, _in_buff, _tmp_sig_len);
+	ms->ms_retval = esv_sign(_in_message, ms->ms_len, _in_signature, _tmp_sig_len);
 err:
 	if (_in_message) free(_in_message);
-	if (_in_buff) {
-		if (memcpy_s(_tmp_buff, _len_buff, _in_buff, _len_buff)) {
+	if (_in_signature) {
+		if (memcpy_s(_tmp_signature, _len_signature, _in_signature, _len_signature)) {
 			status = SGX_ERROR_UNEXPECTED;
 		}
-		free(_in_buff);
+		free(_in_signature);
 	}
 
 	return status;
@@ -246,16 +251,15 @@ static sgx_status_t SGX_CDECL sgx_esv_verify(void* pms)
 	ms_esv_verify_t* ms = SGX_CAST(ms_esv_verify_t*, pms);
 	sgx_status_t status = SGX_SUCCESS;
 	char* _tmp_message = ms->ms_message;
-	size_t _tmp_len = ms->ms_len;
-	size_t _len_message = _tmp_len;
-	char* _in_message = NULL;
-	void* _tmp_buff = ms->ms_buff;
 	size_t _tmp_sig_len = ms->ms_sig_len;
-	size_t _len_buff = _tmp_sig_len;
-	void* _in_buff = NULL;
+	size_t _len_message = _tmp_sig_len;
+	char* _in_message = NULL;
+	void* _tmp_signature = ms->ms_signature;
+	size_t _len_signature = _tmp_sig_len;
+	void* _in_signature = NULL;
 
 	CHECK_UNIQUE_POINTER(_tmp_message, _len_message);
-	CHECK_UNIQUE_POINTER(_tmp_buff, _len_buff);
+	CHECK_UNIQUE_POINTER(_tmp_signature, _len_signature);
 
 	//
 	// fence after pointer checks
@@ -275,24 +279,24 @@ static sgx_status_t SGX_CDECL sgx_esv_verify(void* pms)
 		}
 
 	}
-	if (_tmp_buff != NULL && _len_buff != 0) {
-		_in_buff = (void*)malloc(_len_buff);
-		if (_in_buff == NULL) {
+	if (_tmp_signature != NULL && _len_signature != 0) {
+		_in_signature = (void*)malloc(_len_signature);
+		if (_in_signature == NULL) {
 			status = SGX_ERROR_OUT_OF_MEMORY;
 			goto err;
 		}
 
-		if (memcpy_s(_in_buff, _len_buff, _tmp_buff, _len_buff)) {
+		if (memcpy_s(_in_signature, _len_signature, _tmp_signature, _len_signature)) {
 			status = SGX_ERROR_UNEXPECTED;
 			goto err;
 		}
 
 	}
 
-	ms->ms_retval = esv_verify(_in_message, _tmp_len, _in_buff, _tmp_sig_len);
+	ms->ms_retval = esv_verify(_in_message, ms->ms_len, _in_signature, _tmp_sig_len);
 err:
 	if (_in_message) free(_in_message);
-	if (_in_buff) free(_in_buff);
+	if (_in_signature) free(_in_signature);
 
 	return status;
 }
@@ -331,10 +335,11 @@ SGX_EXTERNC const struct {
 
 SGX_EXTERNC const struct {
 	size_t nr_ocall;
-	uint8_t entry_table[6][5];
+	uint8_t entry_table[7][5];
 } g_dyn_entry_table = {
-	6,
+	7,
 	{
+		{0, 0, 0, 0, 0, },
 		{0, 0, 0, 0, 0, },
 		{0, 0, 0, 0, 0, },
 		{0, 0, 0, 0, 0, },
@@ -388,6 +393,51 @@ sgx_status_t SGX_CDECL esv_sign_callback(const char* str)
 	return status;
 }
 
+sgx_status_t SGX_CDECL esv_verify_callback(uint8_t res, void* sig, size_t sig_len)
+{
+	sgx_status_t status = SGX_SUCCESS;
+	size_t _len_sig = sig_len;
+
+	ms_esv_verify_callback_t* ms = NULL;
+	size_t ocalloc_size = sizeof(ms_esv_verify_callback_t);
+	void *__tmp = NULL;
+
+
+	CHECK_ENCLAVE_POINTER(sig, _len_sig);
+
+	ocalloc_size += (sig != NULL) ? _len_sig : 0;
+
+	__tmp = sgx_ocalloc(ocalloc_size);
+	if (__tmp == NULL) {
+		sgx_ocfree();
+		return SGX_ERROR_UNEXPECTED;
+	}
+	ms = (ms_esv_verify_callback_t*)__tmp;
+	__tmp = (void *)((size_t)__tmp + sizeof(ms_esv_verify_callback_t));
+	ocalloc_size -= sizeof(ms_esv_verify_callback_t);
+
+	ms->ms_res = res;
+	if (sig != NULL) {
+		ms->ms_sig = (void*)__tmp;
+		if (memcpy_s(__tmp, ocalloc_size, sig, _len_sig)) {
+			sgx_ocfree();
+			return SGX_ERROR_UNEXPECTED;
+		}
+		__tmp = (void *)((size_t)__tmp + _len_sig);
+		ocalloc_size -= _len_sig;
+	} else {
+		ms->ms_sig = NULL;
+	}
+	
+	ms->ms_sig_len = sig_len;
+	status = sgx_ocall(1, ms);
+
+	if (status == SGX_SUCCESS) {
+	}
+	sgx_ocfree();
+	return status;
+}
+
 sgx_status_t SGX_CDECL sgx_oc_cpuidex(int cpuinfo[4], int leaf, int subleaf)
 {
 	sgx_status_t status = SGX_SUCCESS;
@@ -424,7 +474,7 @@ sgx_status_t SGX_CDECL sgx_oc_cpuidex(int cpuinfo[4], int leaf, int subleaf)
 	
 	ms->ms_leaf = leaf;
 	ms->ms_subleaf = subleaf;
-	status = sgx_ocall(1, ms);
+	status = sgx_ocall(2, ms);
 
 	if (status == SGX_SUCCESS) {
 		if (cpuinfo) {
@@ -457,7 +507,7 @@ sgx_status_t SGX_CDECL sgx_thread_wait_untrusted_event_ocall(int* retval, const 
 	ocalloc_size -= sizeof(ms_sgx_thread_wait_untrusted_event_ocall_t);
 
 	ms->ms_self = self;
-	status = sgx_ocall(2, ms);
+	status = sgx_ocall(3, ms);
 
 	if (status == SGX_SUCCESS) {
 		if (retval) *retval = ms->ms_retval;
@@ -485,7 +535,7 @@ sgx_status_t SGX_CDECL sgx_thread_set_untrusted_event_ocall(int* retval, const v
 	ocalloc_size -= sizeof(ms_sgx_thread_set_untrusted_event_ocall_t);
 
 	ms->ms_waiter = waiter;
-	status = sgx_ocall(3, ms);
+	status = sgx_ocall(4, ms);
 
 	if (status == SGX_SUCCESS) {
 		if (retval) *retval = ms->ms_retval;
@@ -514,7 +564,7 @@ sgx_status_t SGX_CDECL sgx_thread_setwait_untrusted_events_ocall(int* retval, co
 
 	ms->ms_waiter = waiter;
 	ms->ms_self = self;
-	status = sgx_ocall(4, ms);
+	status = sgx_ocall(5, ms);
 
 	if (status == SGX_SUCCESS) {
 		if (retval) *retval = ms->ms_retval;
@@ -559,7 +609,7 @@ sgx_status_t SGX_CDECL sgx_thread_set_multiple_untrusted_events_ocall(int* retva
 	}
 	
 	ms->ms_total = total;
-	status = sgx_ocall(5, ms);
+	status = sgx_ocall(6, ms);
 
 	if (status == SGX_SUCCESS) {
 		if (retval) *retval = ms->ms_retval;

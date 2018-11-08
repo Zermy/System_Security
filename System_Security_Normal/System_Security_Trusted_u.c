@@ -16,7 +16,7 @@ typedef struct ms_esv_sign_t {
 	int ms_retval;
 	char* ms_message;
 	size_t ms_len;
-	void* ms_buff;
+	void* ms_signature;
 	size_t ms_sig_len;
 } ms_esv_sign_t;
 
@@ -24,7 +24,7 @@ typedef struct ms_esv_verify_t {
 	int ms_retval;
 	char* ms_message;
 	size_t ms_len;
-	void* ms_buff;
+	void* ms_signature;
 	size_t ms_sig_len;
 } ms_esv_verify_t;
 
@@ -35,6 +35,12 @@ typedef struct ms_esv_close_t {
 typedef struct ms_esv_sign_callback_t {
 	const char* ms_str;
 } ms_esv_sign_callback_t;
+
+typedef struct ms_esv_verify_callback_t {
+	uint8_t ms_res;
+	void* ms_sig;
+	size_t ms_sig_len;
+} ms_esv_verify_callback_t;
 
 typedef struct ms_sgx_oc_cpuidex_t {
 	int* ms_cpuinfo;
@@ -68,6 +74,14 @@ static sgx_status_t SGX_CDECL System_Security_Trusted_esv_sign_callback(void* pm
 {
 	ms_esv_sign_callback_t* ms = SGX_CAST(ms_esv_sign_callback_t*, pms);
 	esv_sign_callback(ms->ms_str);
+
+	return SGX_SUCCESS;
+}
+
+static sgx_status_t SGX_CDECL System_Security_Trusted_esv_verify_callback(void* pms)
+{
+	ms_esv_verify_callback_t* ms = SGX_CAST(ms_esv_verify_callback_t*, pms);
+	esv_verify_callback(ms->ms_res, ms->ms_sig, ms->ms_sig_len);
 
 	return SGX_SUCCESS;
 }
@@ -114,11 +128,12 @@ static sgx_status_t SGX_CDECL System_Security_Trusted_sgx_thread_set_multiple_un
 
 static const struct {
 	size_t nr_ocall;
-	void * func_addr[6];
+	void * func_addr[7];
 } ocall_table_System_Security_Trusted = {
-	6,
+	7,
 	{
 		(void*)(uintptr_t)System_Security_Trusted_esv_sign_callback,
+		(void*)(uintptr_t)System_Security_Trusted_esv_verify_callback,
 		(void*)(uintptr_t)System_Security_Trusted_sgx_oc_cpuidex,
 		(void*)(uintptr_t)System_Security_Trusted_sgx_thread_wait_untrusted_event_ocall,
 		(void*)(uintptr_t)System_Security_Trusted_sgx_thread_set_untrusted_event_ocall,
@@ -148,26 +163,26 @@ sgx_status_t esv_seal_keys(sgx_enclave_id_t eid, uint32_t* retval, unsigned char
 	return status;
 }
 
-sgx_status_t esv_sign(sgx_enclave_id_t eid, int* retval, char* message, size_t len, void* buff, size_t sig_len)
+sgx_status_t esv_sign(sgx_enclave_id_t eid, int* retval, char* message, size_t len, void* signature, size_t sig_len)
 {
 	sgx_status_t status;
 	ms_esv_sign_t ms;
 	ms.ms_message = message;
 	ms.ms_len = len;
-	ms.ms_buff = buff;
+	ms.ms_signature = signature;
 	ms.ms_sig_len = sig_len;
 	status = sgx_ecall(eid, 2, &ocall_table_System_Security_Trusted, &ms);
 	if (status == SGX_SUCCESS && retval) *retval = ms.ms_retval;
 	return status;
 }
 
-sgx_status_t esv_verify(sgx_enclave_id_t eid, int* retval, char* message, size_t len, void* buff, size_t sig_len)
+sgx_status_t esv_verify(sgx_enclave_id_t eid, int* retval, char* message, size_t len, void* signature, size_t sig_len)
 {
 	sgx_status_t status;
 	ms_esv_verify_t ms;
 	ms.ms_message = message;
 	ms.ms_len = len;
-	ms.ms_buff = buff;
+	ms.ms_signature = signature;
 	ms.ms_sig_len = sig_len;
 	status = sgx_ecall(eid, 3, &ocall_table_System_Security_Trusted, &ms);
 	if (status == SGX_SUCCESS && retval) *retval = ms.ms_retval;

@@ -309,10 +309,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="GetOpt.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="System_Security_Trusted_u.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="GetOpt.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Simulation|Win32'">Create</PrecompiledHeader>

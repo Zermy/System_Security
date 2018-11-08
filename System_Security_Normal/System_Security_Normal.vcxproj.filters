@@ -27,6 +27,9 @@
     <ClInclude Include="System_Security_Trusted_u.h">
       <Filter>Generated Files</Filter>
     </ClInclude>
+    <ClInclude Include="GetOpt.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -37,6 +40,9 @@
     </ClCompile>
     <ClCompile Include="System_Security_Trusted_u.c">
       <Filter>Generated Files</Filter>
+    </ClCompile>
+    <ClCompile Include="GetOpt.cpp">
+      <Filter>Quelldateien</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

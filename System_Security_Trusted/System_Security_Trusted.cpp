@@ -72,25 +72,19 @@ error:
 }
 
 
-int esv_sign(char* message, size_t len, void* buff, size_t sig_len)
+int esv_sign(char* message, size_t len, void* signature, size_t sig_len)
 {
-	if (sig_len != sizeof(sgx_ec256_signature_t))
-		return -1;
-	esv_sign_callback("HSJS");
-	sgx_status_t ret = sgx_ecdsa_sign((uint8_t*)message, len, &p_private, (sgx_ec256_signature_t*)buff, ctx);
+	esv_sign_callback((char*)p_private.r);
+	sgx_status_t ret = sgx_ecdsa_sign((uint8_t*)message, len, &p_private, (sgx_ec256_signature_t*)signature, ctx);
 
 	return ret;
 }
 
-int esv_verify(char* message, size_t len, void* buff, size_t sig_len)
+int esv_verify(char* message, size_t len, void* signature, size_t sig_len)
 {
 	uint8_t res;
 
-	if (sig_len != sizeof(sgx_ec256_signature_t))
-		return -1;
-
-	sgx_status_t ret = sgx_ecdsa_verify((uint8_t*)message, len, &p_public, (sgx_ec256_signature_t*)buff, &res, ctx);
-
+	sgx_status_t ret = sgx_ecdsa_verify((uint8_t*)message, len, &p_public, (sgx_ec256_signature_t*)signature, &res, ctx);
 	return res;
 
 }

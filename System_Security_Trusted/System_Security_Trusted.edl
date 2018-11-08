@@ -5,14 +5,14 @@ enclave {
         /* define ECALLs here. */
 		public int esv_init([in, size=len] unsigned char* p_add_sealed_data, uint32_t len);
 		public uint32_t esv_seal_keys([out] unsigned char** sealed_data);
-		public int esv_sign([in, size=len] char* message, size_t len, [out, size=sig_len] void* buff, size_t sig_len);
-		public int esv_verify([in, size=len] char* message, size_t len, [in, size=sig_len] void* buff, size_t sig_len);
+		public int esv_sign([in, size=sig_len] char* message, size_t len, [out, size=sig_len] void* signature, size_t sig_len);
+		public int esv_verify([in, size=sig_len] char* message, size_t len, [in, size=sig_len] void* signature,size_t sig_len);
 		public int esv_close();
     };
 
     untrusted {
         /* define OCALLs here. */
 		void esv_sign_callback([in, string] const char *str);
-
+		void esv_verify_callback(uint8_t res, [in, size=sig_len] void* sig, size_t sig_len);
     };
 };
