@@ -14,13 +14,13 @@
 extern "C" {
 #endif
 
-#ifndef ESV_SIGN_CALLBACK_DEFINED__
-#define ESV_SIGN_CALLBACK_DEFINED__
-void SGX_UBRIDGE(SGX_NOCONVENTION, esv_sign_callback, (const char* str));
+#ifndef ESV_WRITE_DATA_DEFINED__
+#define ESV_WRITE_DATA_DEFINED__
+void SGX_UBRIDGE(SGX_NOCONVENTION, esv_write_data, (const char* file_name, const unsigned char* p_data, size_t len));
 #endif
-#ifndef ESV_VERIFY_CALLBACK_DEFINED__
-#define ESV_VERIFY_CALLBACK_DEFINED__
-void SGX_UBRIDGE(SGX_NOCONVENTION, esv_verify_callback, (uint8_t res, void* sig, size_t sig_len));
+#ifndef ESV_READ_DATA_DEFINED__
+#define ESV_READ_DATA_DEFINED__
+void SGX_UBRIDGE(SGX_NOCONVENTION, esv_read_data, (const char* file_name, unsigned char** pp_data, size_t* len));
 #endif
 #ifndef SGX_OC_CPUIDEX_DEFINED__
 #define SGX_OC_CPUIDEX_DEFINED__
@@ -43,10 +43,10 @@ int SGX_UBRIDGE(SGX_CDECL, sgx_thread_setwait_untrusted_events_ocall, (const voi
 int SGX_UBRIDGE(SGX_CDECL, sgx_thread_set_multiple_untrusted_events_ocall, (const void** waiters, size_t total));
 #endif
 
-sgx_status_t esv_init(sgx_enclave_id_t eid, int* retval, unsigned char* p_add_sealed_data, uint32_t len);
-sgx_status_t esv_seal_keys(sgx_enclave_id_t eid, uint32_t* retval, unsigned char** sealed_data);
-sgx_status_t esv_sign(sgx_enclave_id_t eid, int* retval, char* message, size_t len, void* signature, size_t sig_len);
-sgx_status_t esv_verify(sgx_enclave_id_t eid, int* retval, char* message, size_t len, void* signature, size_t sig_len);
+sgx_status_t esv_init(sgx_enclave_id_t eid, int* retval, const char* sealed_data_file);
+sgx_status_t esv_seal_keys(sgx_enclave_id_t eid, int* retval, const char* sealed_data_file);
+sgx_status_t esv_sign(sgx_enclave_id_t eid, int* retval, const char* message, void* signature, size_t sig_len);
+sgx_status_t esv_verify(sgx_enclave_id_t eid, int* retval, const char* message, void* signature, size_t sig_len);
 sgx_status_t esv_close(sgx_enclave_id_t eid, int* retval);
 
 #ifdef __cplusplus

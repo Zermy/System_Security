@@ -13,14 +13,14 @@
 extern "C" {
 #endif
 
-int esv_init(unsigned char* p_add_sealed_data, uint32_t len);
-uint32_t esv_seal_keys(unsigned char** sealed_data);
-int esv_sign(char* message, size_t len, void* signature, size_t sig_len);
-int esv_verify(char* message, size_t len, void* signature, size_t sig_len);
+int esv_init(const char* sealed_data_file);
+int esv_seal_keys(const char* sealed_data_file);
+int esv_sign(const char* message, void* signature, size_t sig_len);
+int esv_verify(const char* message, void* signature, size_t sig_len);
 int esv_close(void);
 
-sgx_status_t SGX_CDECL esv_sign_callback(const char* str);
-sgx_status_t SGX_CDECL esv_verify_callback(uint8_t res, void* sig, size_t sig_len);
+sgx_status_t SGX_CDECL esv_write_data(const char* file_name, const unsigned char* p_data, size_t len);
+sgx_status_t SGX_CDECL esv_read_data(const char* file_name, unsigned char** pp_data, size_t* len);
 sgx_status_t SGX_CDECL sgx_oc_cpuidex(int cpuinfo[4], int leaf, int subleaf);
 sgx_status_t SGX_CDECL sgx_thread_wait_untrusted_event_ocall(int* retval, const void* self);
 sgx_status_t SGX_CDECL sgx_thread_set_untrusted_event_ocall(int* retval, const void* waiter);

@@ -3,27 +3,28 @@
 
 typedef struct ms_esv_init_t {
 	int ms_retval;
-	unsigned char* ms_p_add_sealed_data;
-	uint32_t ms_len;
+	const char* ms_sealed_data_file;
+	size_t ms_sealed_data_file_len;
 } ms_esv_init_t;
 
 typedef struct ms_esv_seal_keys_t {
-	uint32_t ms_retval;
-	unsigned char** ms_sealed_data;
+	int ms_retval;
+	const char* ms_sealed_data_file;
+	size_t ms_sealed_data_file_len;
 } ms_esv_seal_keys_t;
 
 typedef struct ms_esv_sign_t {
 	int ms_retval;
-	char* ms_message;
-	size_t ms_len;
+	const char* ms_message;
+	size_t ms_message_len;
 	void* ms_signature;
 	size_t ms_sig_len;
 } ms_esv_sign_t;
 
 typedef struct ms_esv_verify_t {
 	int ms_retval;
-	char* ms_message;
-	size_t ms_len;
+	const char* ms_message;
+	size_t ms_message_len;
 	void* ms_signature;
 	size_t ms_sig_len;
 } ms_esv_verify_t;
@@ -32,15 +33,17 @@ typedef struct ms_esv_close_t {
 	int ms_retval;
 } ms_esv_close_t;
 
-typedef struct ms_esv_sign_callback_t {
-	const char* ms_str;
-} ms_esv_sign_callback_t;
+typedef struct ms_esv_write_data_t {
+	const char* ms_file_name;
+	const unsigned char* ms_p_data;
+	size_t ms_len;
+} ms_esv_write_data_t;
 
-typedef struct ms_esv_verify_callback_t {
-	uint8_t ms_res;
-	void* ms_sig;
-	size_t ms_sig_len;
-} ms_esv_verify_callback_t;
+typedef struct ms_esv_read_data_t {
+	const char* ms_file_name;
+	unsigned char** ms_pp_data;
+	size_t* ms_len;
+} ms_esv_read_data_t;
 
 typedef struct ms_sgx_oc_cpuidex_t {
 	int* ms_cpuinfo;
@@ -70,18 +73,18 @@ typedef struct ms_sgx_thread_set_multiple_untrusted_events_ocall_t {
 	size_t ms_total;
 } ms_sgx_thread_set_multiple_untrusted_events_ocall_t;
 
-static sgx_status_t SGX_CDECL System_Security_Trusted_esv_sign_callback(void* pms)
+static sgx_status_t SGX_CDECL System_Security_Trusted_esv_write_data(void* pms)
 {
-	ms_esv_sign_callback_t* ms = SGX_CAST(ms_esv_sign_callback_t*, pms);
-	esv_sign_callback(ms->ms_str);
+	ms_esv_write_data_t* ms = SGX_CAST(ms_esv_write_data_t*, pms);
+	esv_write_data(ms->ms_file_name, ms->ms_p_data, ms->ms_len);
 
 	return SGX_SUCCESS;
 }
 
-static sgx_status_t SGX_CDECL System_Security_Trusted_esv_verify_callback(void* pms)
+static sgx_status_t SGX_CDECL System_Security_Trusted_esv_read_data(void* pms)
 {
-	ms_esv_verify_callback_t* ms = SGX_CAST(ms_esv_verify_callback_t*, pms);
-	esv_verify_callback(ms->ms_res, ms->ms_sig, ms->ms_sig_len);
+	ms_esv_read_data_t* ms = SGX_CAST(ms_esv_read_data_t*, pms);
+	esv_read_data(ms->ms_file_name, ms->ms_pp_data, ms->ms_len);
 
 	return SGX_SUCCESS;
 }
@@ -132,8 +135,8 @@ static const struct {
 } ocall_table_System_Security_Trusted = {
 	7,
 	{
-		(void*)(uintptr_t)System_Security_Trusted_esv_sign_callback,
-		(void*)(uintptr_t)System_Security_Trusted_esv_verify_callback,
+		(void*)(uintptr_t)System_Security_Trusted_esv_write_data,
+		(void*)(uintptr_t)System_Security_Trusted_esv_read_data,
 		(void*)(uintptr_t)System_Security_Trusted_sgx_oc_cpuidex,
 		(void*)(uintptr_t)System_Security_Trusted_sgx_thread_wait_untrusted_event_ocall,
 		(void*)(uintptr_t)System_Security_Trusted_sgx_thread_set_untrusted_event_ocall,
@@ -142,33 +145,34 @@ static const struct {
 	}
 };
 
-sgx_status_t esv_init(sgx_enclave_id_t eid, int* retval, unsigned char* p_add_sealed_data, uint32_t len)
+sgx_status_t esv_init(sgx_enclave_id_t eid, int* retval, const char* sealed_data_file)
 {
 	sgx_status_t status;
 	ms_esv_init_t ms;
-	ms.ms_p_add_sealed_data = p_add_sealed_data;
-	ms.ms_len = len;
+	ms.ms_sealed_data_file = sealed_data_file;
+	ms.ms_sealed_data_file_len = sealed_data_file ? strlen(sealed_data_file) + 1 : 0;
 	status = sgx_ecall(eid, 0, &ocall_table_System_Security_Trusted, &ms);
 	if (status == SGX_SUCCESS && retval) *retval = ms.ms_retval;
 	return status;
 }
 
-sgx_status_t esv_seal_keys(sgx_enclave_id_t eid, uint32_t* retval, unsigned char** sealed_data)
+sgx_status_t esv_seal_keys(sgx_enclave_id_t eid, int* retval, const char* sealed_data_file)
 {
 	sgx_status_t status;
 	ms_esv_seal_keys_t ms;
-	ms.ms_sealed_data = sealed_data;
+	ms.ms_sealed_data_file = sealed_data_file;
+	ms.ms_sealed_data_file_len = sealed_data_file ? strlen(sealed_data_file) + 1 : 0;
 	status = sgx_ecall(eid, 1, &ocall_table_System_Security_Trusted, &ms);
 	if (status == SGX_SUCCESS && retval) *retval = ms.ms_retval;
 	return status;
 }
 
-sgx_status_t esv_sign(sgx_enclave_id_t eid, int* retval, char* message, size_t len, void* signature, size_t sig_len)
+sgx_status_t esv_sign(sgx_enclave_id_t eid, int* retval, const char* message, void* signature, size_t sig_len)
 {
 	sgx_status_t status;
 	ms_esv_sign_t ms;
 	ms.ms_message = message;
-	ms.ms_len = len;
+	ms.ms_message_len = message ? strlen(message) + 1 : 0;
 	ms.ms_signature = signature;
 	ms.ms_sig_len = sig_len;
 	status = sgx_ecall(eid, 2, &ocall_table_System_Security_Trusted, &ms);
@@ -176,12 +180,12 @@ sgx_status_t esv_sign(sgx_enclave_id_t eid, int* retval, char* message, size_t l
 	return status;
 }
 
-sgx_status_t esv_verify(sgx_enclave_id_t eid, int* retval, char* message, size_t len, void* signature, size_t sig_len)
+sgx_status_t esv_verify(sgx_enclave_id_t eid, int* retval, const char* message, void* signature, size_t sig_len)
 {
 	sgx_status_t status;
 	ms_esv_verify_t ms;
 	ms.ms_message = message;
-	ms.ms_len = len;
+	ms.ms_message_len = message ? strlen(message) + 1 : 0;
 	ms.ms_signature = signature;
 	ms.ms_sig_len = sig_len;
 	status = sgx_ecall(eid, 3, &ocall_table_System_Security_Trusted, &ms);

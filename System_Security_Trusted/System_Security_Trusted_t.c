@@ -25,27 +25,28 @@
 
 typedef struct ms_esv_init_t {
 	int ms_retval;
-	unsigned char* ms_p_add_sealed_data;
-	uint32_t ms_len;
+	const char* ms_sealed_data_file;
+	size_t ms_sealed_data_file_len;
 } ms_esv_init_t;
 
 typedef struct ms_esv_seal_keys_t {
-	uint32_t ms_retval;
-	unsigned char** ms_sealed_data;
+	int ms_retval;
+	const char* ms_sealed_data_file;
+	size_t ms_sealed_data_file_len;
 } ms_esv_seal_keys_t;
 
 typedef struct ms_esv_sign_t {
 	int ms_retval;
-	char* ms_message;
-	size_t ms_len;
+	const char* ms_message;
+	size_t ms_message_len;
 	void* ms_signature;
 	size_t ms_sig_len;
 } ms_esv_sign_t;
 
 typedef struct ms_esv_verify_t {
 	int ms_retval;
-	char* ms_message;
-	size_t ms_len;
+	const char* ms_message;
+	size_t ms_message_len;
 	void* ms_signature;
 	size_t ms_sig_len;
 } ms_esv_verify_t;
@@ -54,15 +55,17 @@ typedef struct ms_esv_close_t {
 	int ms_retval;
 } ms_esv_close_t;
 
-typedef struct ms_esv_sign_callback_t {
-	const char* ms_str;
-} ms_esv_sign_callback_t;
+typedef struct ms_esv_write_data_t {
+	const char* ms_file_name;
+	const unsigned char* ms_p_data;
+	size_t ms_len;
+} ms_esv_write_data_t;
 
-typedef struct ms_esv_verify_callback_t {
-	uint8_t ms_res;
-	void* ms_sig;
-	size_t ms_sig_len;
-} ms_esv_verify_callback_t;
+typedef struct ms_esv_read_data_t {
+	const char* ms_file_name;
+	unsigned char** ms_pp_data;
+	size_t* ms_len;
+} ms_esv_read_data_t;
 
 typedef struct ms_sgx_oc_cpuidex_t {
 	int* ms_cpuinfo;
@@ -107,35 +110,40 @@ static sgx_status_t SGX_CDECL sgx_esv_init(void* pms)
 	sgx_lfence();
 	ms_esv_init_t* ms = SGX_CAST(ms_esv_init_t*, pms);
 	sgx_status_t status = SGX_SUCCESS;
-	unsigned char* _tmp_p_add_sealed_data = ms->ms_p_add_sealed_data;
-	uint32_t _tmp_len = ms->ms_len;
-	size_t _len_p_add_sealed_data = _tmp_len;
-	unsigned char* _in_p_add_sealed_data = NULL;
+	const char* _tmp_sealed_data_file = ms->ms_sealed_data_file;
+	size_t _len_sealed_data_file = ms->ms_sealed_data_file_len ;
+	char* _in_sealed_data_file = NULL;
 
-	CHECK_UNIQUE_POINTER(_tmp_p_add_sealed_data, _len_p_add_sealed_data);
+	CHECK_UNIQUE_POINTER(_tmp_sealed_data_file, _len_sealed_data_file);
 
 	//
 	// fence after pointer checks
 	//
 	sgx_lfence();
 
-	if (_tmp_p_add_sealed_data != NULL && _len_p_add_sealed_data != 0) {
-		_in_p_add_sealed_data = (unsigned char*)malloc(_len_p_add_sealed_data);
-		if (_in_p_add_sealed_data == NULL) {
+	if (_tmp_sealed_data_file != NULL && _len_sealed_data_file != 0) {
+		_in_sealed_data_file = (char*)malloc(_len_sealed_data_file);
+		if (_in_sealed_data_file == NULL) {
 			status = SGX_ERROR_OUT_OF_MEMORY;
 			goto err;
 		}
 
-		if (memcpy_s(_in_p_add_sealed_data, _len_p_add_sealed_data, _tmp_p_add_sealed_data, _len_p_add_sealed_data)) {
+		if (memcpy_s((void*)_in_sealed_data_file, _len_sealed_data_file, _tmp_sealed_data_file, _len_sealed_data_file)) {
 			status = SGX_ERROR_UNEXPECTED;
 			goto err;
 		}
 
+		_in_sealed_data_file[_len_sealed_data_file - 1] = '\0';
+		if (_len_sealed_data_file != strlen(_in_sealed_data_file) + 1)
+		{
+			status = SGX_ERROR_UNEXPECTED;
+			goto err;
+		}
 	}
 
-	ms->ms_retval = esv_init(_in_p_add_sealed_data, _tmp_len);
+	ms->ms_retval = esv_init((const char*)_in_sealed_data_file);
 err:
-	if (_in_p_add_sealed_data) free(_in_p_add_sealed_data);
+	if (_in_sealed_data_file) free((void*)_in_sealed_data_file);
 
 	return status;
 }
@@ -149,34 +157,40 @@ static sgx_status_t SGX_CDECL sgx_esv_seal_keys(void* pms)
 	sgx_lfence();
 	ms_esv_seal_keys_t* ms = SGX_CAST(ms_esv_seal_keys_t*, pms);
 	sgx_status_t status = SGX_SUCCESS;
-	unsigned char** _tmp_sealed_data = ms->ms_sealed_data;
-	size_t _len_sealed_data = sizeof(unsigned char*);
-	unsigned char** _in_sealed_data = NULL;
+	const char* _tmp_sealed_data_file = ms->ms_sealed_data_file;
+	size_t _len_sealed_data_file = ms->ms_sealed_data_file_len ;
+	char* _in_sealed_data_file = NULL;
 
-	CHECK_UNIQUE_POINTER(_tmp_sealed_data, _len_sealed_data);
+	CHECK_UNIQUE_POINTER(_tmp_sealed_data_file, _len_sealed_data_file);
 
 	//
 	// fence after pointer checks
 	//
 	sgx_lfence();
 
-	if (_tmp_sealed_data != NULL && _len_sealed_data != 0) {
-		if ((_in_sealed_data = (unsigned char**)malloc(_len_sealed_data)) == NULL) {
+	if (_tmp_sealed_data_file != NULL && _len_sealed_data_file != 0) {
+		_in_sealed_data_file = (char*)malloc(_len_sealed_data_file);
+		if (_in_sealed_data_file == NULL) {
 			status = SGX_ERROR_OUT_OF_MEMORY;
 			goto err;
 		}
 
-		memset((void*)_in_sealed_data, 0, _len_sealed_data);
+		if (memcpy_s((void*)_in_sealed_data_file, _len_sealed_data_file, _tmp_sealed_data_file, _len_sealed_data_file)) {
+			status = SGX_ERROR_UNEXPECTED;
+			goto err;
+		}
+
+		_in_sealed_data_file[_len_sealed_data_file - 1] = '\0';
+		if (_len_sealed_data_file != strlen(_in_sealed_data_file) + 1)
+		{
+			status = SGX_ERROR_UNEXPECTED;
+			goto err;
+		}
 	}
 
-	ms->ms_retval = esv_seal_keys(_in_sealed_data);
+	ms->ms_retval = esv_seal_keys((const char*)_in_sealed_data_file);
 err:
-	if (_in_sealed_data) {
-		if (memcpy_s(_tmp_sealed_data, _len_sealed_data, _in_sealed_data, _len_sealed_data)) {
-			status = SGX_ERROR_UNEXPECTED;
-		}
-		free(_in_sealed_data);
-	}
+	if (_in_sealed_data_file) free((void*)_in_sealed_data_file);
 
 	return status;
 }
@@ -190,11 +204,11 @@ static sgx_status_t SGX_CDECL sgx_esv_sign(void* pms)
 	sgx_lfence();
 	ms_esv_sign_t* ms = SGX_CAST(ms_esv_sign_t*, pms);
 	sgx_status_t status = SGX_SUCCESS;
-	char* _tmp_message = ms->ms_message;
-	size_t _tmp_sig_len = ms->ms_sig_len;
-	size_t _len_message = _tmp_sig_len;
+	const char* _tmp_message = ms->ms_message;
+	size_t _len_message = ms->ms_message_len ;
 	char* _in_message = NULL;
 	void* _tmp_signature = ms->ms_signature;
+	size_t _tmp_sig_len = ms->ms_sig_len;
 	size_t _len_signature = _tmp_sig_len;
 	void* _in_signature = NULL;
 
@@ -213,11 +227,17 @@ static sgx_status_t SGX_CDECL sgx_esv_sign(void* pms)
 			goto err;
 		}
 
-		if (memcpy_s(_in_message, _len_message, _tmp_message, _len_message)) {
+		if (memcpy_s((void*)_in_message, _len_message, _tmp_message, _len_message)) {
 			status = SGX_ERROR_UNEXPECTED;
 			goto err;
 		}
 
+		_in_message[_len_message - 1] = '\0';
+		if (_len_message != strlen(_in_message) + 1)
+		{
+			status = SGX_ERROR_UNEXPECTED;
+			goto err;
+		}
 	}
 	if (_tmp_signature != NULL && _len_signature != 0) {
 		if ((_in_signature = (void*)malloc(_len_signature)) == NULL) {
@@ -228,9 +248,9 @@ static sgx_status_t SGX_CDECL sgx_esv_sign(void* pms)
 		memset((void*)_in_signature, 0, _len_signature);
 	}
 
-	ms->ms_retval = esv_sign(_in_message, ms->ms_len, _in_signature, _tmp_sig_len);
+	ms->ms_retval = esv_sign((const char*)_in_message, _in_signature, _tmp_sig_len);
 err:
-	if (_in_message) free(_in_message);
+	if (_in_message) free((void*)_in_message);
 	if (_in_signature) {
 		if (memcpy_s(_tmp_signature, _len_signature, _in_signature, _len_signature)) {
 			status = SGX_ERROR_UNEXPECTED;
@@ -250,11 +270,11 @@ static sgx_status_t SGX_CDECL sgx_esv_verify(void* pms)
 	sgx_lfence();
 	ms_esv_verify_t* ms = SGX_CAST(ms_esv_verify_t*, pms);
 	sgx_status_t status = SGX_SUCCESS;
-	char* _tmp_message = ms->ms_message;
-	size_t _tmp_sig_len = ms->ms_sig_len;
-	size_t _len_message = _tmp_sig_len;
+	const char* _tmp_message = ms->ms_message;
+	size_t _len_message = ms->ms_message_len ;
 	char* _in_message = NULL;
 	void* _tmp_signature = ms->ms_signature;
+	size_t _tmp_sig_len = ms->ms_sig_len;
 	size_t _len_signature = _tmp_sig_len;
 	void* _in_signature = NULL;
 
@@ -273,11 +293,17 @@ static sgx_status_t SGX_CDECL sgx_esv_verify(void* pms)
 			goto err;
 		}
 
-		if (memcpy_s(_in_message, _len_message, _tmp_message, _len_message)) {
+		if (memcpy_s((void*)_in_message, _len_message, _tmp_message, _len_message)) {
 			status = SGX_ERROR_UNEXPECTED;
 			goto err;
 		}
 
+		_in_message[_len_message - 1] = '\0';
+		if (_len_message != strlen(_in_message) + 1)
+		{
+			status = SGX_ERROR_UNEXPECTED;
+			goto err;
+		}
 	}
 	if (_tmp_signature != NULL && _len_signature != 0) {
 		_in_signature = (void*)malloc(_len_signature);
@@ -293,9 +319,9 @@ static sgx_status_t SGX_CDECL sgx_esv_verify(void* pms)
 
 	}
 
-	ms->ms_retval = esv_verify(_in_message, ms->ms_len, _in_signature, _tmp_sig_len);
+	ms->ms_retval = esv_verify((const char*)_in_message, _in_signature, _tmp_sig_len);
 err:
-	if (_in_message) free(_in_message);
+	if (_in_message) free((void*)_in_message);
 	if (_in_signature) free(_in_signature);
 
 	return status;
@@ -350,41 +376,57 @@ SGX_EXTERNC const struct {
 };
 
 
-sgx_status_t SGX_CDECL esv_sign_callback(const char* str)
+sgx_status_t SGX_CDECL esv_write_data(const char* file_name, const unsigned char* p_data, size_t len)
 {
 	sgx_status_t status = SGX_SUCCESS;
-	size_t _len_str = str ? strlen(str) + 1 : 0;
+	size_t _len_file_name = file_name ? strlen(file_name) + 1 : 0;
+	size_t _len_p_data = len;
 
-	ms_esv_sign_callback_t* ms = NULL;
-	size_t ocalloc_size = sizeof(ms_esv_sign_callback_t);
+	ms_esv_write_data_t* ms = NULL;
+	size_t ocalloc_size = sizeof(ms_esv_write_data_t);
 	void *__tmp = NULL;
 
 
-	CHECK_ENCLAVE_POINTER(str, _len_str);
+	CHECK_ENCLAVE_POINTER(file_name, _len_file_name);
+	CHECK_ENCLAVE_POINTER(p_data, _len_p_data);
 
-	ocalloc_size += (str != NULL) ? _len_str : 0;
+	ocalloc_size += (file_name != NULL) ? _len_file_name : 0;
+	ocalloc_size += (p_data != NULL) ? _len_p_data : 0;
 
 	__tmp = sgx_ocalloc(ocalloc_size);
 	if (__tmp == NULL) {
 		sgx_ocfree();
 		return SGX_ERROR_UNEXPECTED;
 	}
-	ms = (ms_esv_sign_callback_t*)__tmp;
-	__tmp = (void *)((size_t)__tmp + sizeof(ms_esv_sign_callback_t));
-	ocalloc_size -= sizeof(ms_esv_sign_callback_t);
+	ms = (ms_esv_write_data_t*)__tmp;
+	__tmp = (void *)((size_t)__tmp + sizeof(ms_esv_write_data_t));
+	ocalloc_size -= sizeof(ms_esv_write_data_t);
 
-	if (str != NULL) {
-		ms->ms_str = (const char*)__tmp;
-		if (memcpy_s(__tmp, ocalloc_size, str, _len_str)) {
+	if (file_name != NULL) {
+		ms->ms_file_name = (const char*)__tmp;
+		if (memcpy_s(__tmp, ocalloc_size, file_name, _len_file_name)) {
 			sgx_ocfree();
 			return SGX_ERROR_UNEXPECTED;
 		}
-		__tmp = (void *)((size_t)__tmp + _len_str);
-		ocalloc_size -= _len_str;
+		__tmp = (void *)((size_t)__tmp + _len_file_name);
+		ocalloc_size -= _len_file_name;
 	} else {
-		ms->ms_str = NULL;
+		ms->ms_file_name = NULL;
 	}
 	
+	if (p_data != NULL) {
+		ms->ms_p_data = (const unsigned char*)__tmp;
+		if (memcpy_s(__tmp, ocalloc_size, p_data, _len_p_data)) {
+			sgx_ocfree();
+			return SGX_ERROR_UNEXPECTED;
+		}
+		__tmp = (void *)((size_t)__tmp + _len_p_data);
+		ocalloc_size -= _len_p_data;
+	} else {
+		ms->ms_p_data = NULL;
+	}
+	
+	ms->ms_len = len;
 	status = sgx_ocall(0, ms);
 
 	if (status == SGX_SUCCESS) {
@@ -393,46 +435,84 @@ sgx_status_t SGX_CDECL esv_sign_callback(const char* str)
 	return status;
 }
 
-sgx_status_t SGX_CDECL esv_verify_callback(uint8_t res, void* sig, size_t sig_len)
+sgx_status_t SGX_CDECL esv_read_data(const char* file_name, unsigned char** pp_data, size_t* len)
 {
 	sgx_status_t status = SGX_SUCCESS;
-	size_t _len_sig = sig_len;
+	size_t _len_file_name = file_name ? strlen(file_name) + 1 : 0;
+	size_t _len_pp_data = sizeof(unsigned char*);
+	size_t _len_len = sizeof(size_t);
 
-	ms_esv_verify_callback_t* ms = NULL;
-	size_t ocalloc_size = sizeof(ms_esv_verify_callback_t);
+	ms_esv_read_data_t* ms = NULL;
+	size_t ocalloc_size = sizeof(ms_esv_read_data_t);
 	void *__tmp = NULL;
 
+	void *__tmp_pp_data = NULL;
+	void *__tmp_len = NULL;
 
-	CHECK_ENCLAVE_POINTER(sig, _len_sig);
+	CHECK_ENCLAVE_POINTER(file_name, _len_file_name);
+	CHECK_ENCLAVE_POINTER(pp_data, _len_pp_data);
+	CHECK_ENCLAVE_POINTER(len, _len_len);
 
-	ocalloc_size += (sig != NULL) ? _len_sig : 0;
+	ocalloc_size += (file_name != NULL) ? _len_file_name : 0;
+	ocalloc_size += (pp_data != NULL) ? _len_pp_data : 0;
+	ocalloc_size += (len != NULL) ? _len_len : 0;
 
 	__tmp = sgx_ocalloc(ocalloc_size);
 	if (__tmp == NULL) {
 		sgx_ocfree();
 		return SGX_ERROR_UNEXPECTED;
 	}
-	ms = (ms_esv_verify_callback_t*)__tmp;
-	__tmp = (void *)((size_t)__tmp + sizeof(ms_esv_verify_callback_t));
-	ocalloc_size -= sizeof(ms_esv_verify_callback_t);
+	ms = (ms_esv_read_data_t*)__tmp;
+	__tmp = (void *)((size_t)__tmp + sizeof(ms_esv_read_data_t));
+	ocalloc_size -= sizeof(ms_esv_read_data_t);
 
-	ms->ms_res = res;
-	if (sig != NULL) {
-		ms->ms_sig = (void*)__tmp;
-		if (memcpy_s(__tmp, ocalloc_size, sig, _len_sig)) {
+	if (file_name != NULL) {
+		ms->ms_file_name = (const char*)__tmp;
+		if (memcpy_s(__tmp, ocalloc_size, file_name, _len_file_name)) {
 			sgx_ocfree();
 			return SGX_ERROR_UNEXPECTED;
 		}
-		__tmp = (void *)((size_t)__tmp + _len_sig);
-		ocalloc_size -= _len_sig;
+		__tmp = (void *)((size_t)__tmp + _len_file_name);
+		ocalloc_size -= _len_file_name;
 	} else {
-		ms->ms_sig = NULL;
+		ms->ms_file_name = NULL;
 	}
 	
-	ms->ms_sig_len = sig_len;
+	if (pp_data != NULL) {
+		ms->ms_pp_data = (unsigned char**)__tmp;
+		__tmp_pp_data = __tmp;
+		memset(__tmp_pp_data, 0, _len_pp_data);
+		__tmp = (void *)((size_t)__tmp + _len_pp_data);
+		ocalloc_size -= _len_pp_data;
+	} else {
+		ms->ms_pp_data = NULL;
+	}
+	
+	if (len != NULL) {
+		ms->ms_len = (size_t*)__tmp;
+		__tmp_len = __tmp;
+		memset(__tmp_len, 0, _len_len);
+		__tmp = (void *)((size_t)__tmp + _len_len);
+		ocalloc_size -= _len_len;
+	} else {
+		ms->ms_len = NULL;
+	}
+	
 	status = sgx_ocall(1, ms);
 
 	if (status == SGX_SUCCESS) {
+		if (pp_data) {
+			if (memcpy_s((void*)pp_data, _len_pp_data, __tmp_pp_data, _len_pp_data)) {
+				sgx_ocfree();
+				return SGX_ERROR_UNEXPECTED;
+			}
+		}
+		if (len) {
+			if (memcpy_s((void*)len, _len_len, __tmp_len, _len_len)) {
+				sgx_ocfree();
+				return SGX_ERROR_UNEXPECTED;
+			}
+		}
 	}
 	sgx_ocfree();
 	return status;
