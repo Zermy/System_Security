@@ -3,7 +3,9 @@ enclave {
 
     trusted {
         /* define ECALLs here. */
+
 		public int esv_init([in, string] const char* sealed_data_file);
+
 		public int esv_seal_keys([in, string] const char* sealed_data_file);
 
 		public int esv_sign([in, string] const char* message, [out, size=sig_len] void* signature, size_t sig_len);
